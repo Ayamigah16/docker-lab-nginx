@@ -1,221 +1,134 @@
-# Docker Lab - Production-Ready Flask Application
+# Docker Lab - Nginx Reverse Proxy with Flask Backend
 
-A secure, production-ready Flask application demonstrating Docker best practices and security hardening.
+Production-ready containerized application demonstrating Docker best practices: Nginx reverse proxy, secure Flask backend, container networking, and centralized logging.
 
-## 🔒 Security Features
+## 🎯 What's Inside
 
-### ✅ Implemented Best Practices
+- **Flask Backend** (`/app`) - Secure Python application with multi-stage builds, non-root user, read-only filesystem
+- **Nginx Proxy** (`/nginx-proxy`) - Reverse proxy routing traffic to backend with logging
+- **Docker Network** - Containers communicate on isolated bridge network
+- **Centralized Logs** - All logs in `/logs` directory (app and nginx)
+- **Docker Compose** - Single-command orchestration of all services
 
-1. **Multi-Stage Builds**
-   - Smaller final image size
-   - Build dependencies not included in runtime
-   - Uses Python virtual environment
-
-2. **Optimized Layer Caching**
-   - `requirements.txt` copied separately before application code
-   - Dependencies installed only when requirements change
-   - Faster rebuilds during development
-
-3. **Non-Root User**
-   - Container runs as `appuser` (not root)
-   - Reduces attack surface
-   - Follows principle of least privilege
-
-4. **Read-Only Filesystem**
-   - Root filesystem mounted as read-only
-   - Only `/tmp` is writable (via tmpfs)
-   - Prevents malicious file modifications
-
-5. **Externalized Configuration**
-   - No hardcoded values in code
-   - Environment variables for all configuration
-   - Easy to change per environment
-
-6. **Additional Security**
-   - `no-new-privileges` prevents privilege escalation
-   - All Linux capabilities dropped
-   - Minimal base image (`python:3.9-slim`)
-
-## 📁 Project Structure
+## 📁 Structure
 
 ```
-docker-lab/
-├── app.py                 # Flask application with env var support
-├── Dockerfile            # Multi-stage, secure Dockerfile
-├── docker-compose.yml    # Compose file with security settings
-├── requirements.txt      # Python dependencies
-├── .env.example         # Example configuration file
-├── .dockerignore        # Files to exclude from build
-├── run-secure.sh        # Helper script for secure deployment
-└── README.md           # This file
+docker-lab-nginx/
+├── app/                    # Flask backend application
+│   ├── app.py             # Application code
+│   ├── Dockerfile         # Multi-stage secure build
+│   ├── run-secure.sh      # Helper script
+│   └── README.md          # Detailed app docs
+├── nginx-proxy/           # Nginx reverse proxy
+│   ├── nginx.conf         # Proxy configuration
+│   ├── Dockerfile         # Nginx image
+│   ├── run-proxy.sh       # Helper script with logging
+│   └── README.md          # Detailed proxy docs
+├── logs/                  # Centralized logs (ignored by git)
+│   ├── app/              # Flask logs
+│   └── nginx-proxy/      # Nginx access/error logs
+├── docker-compose.yml     # Service orchestration
+└── README.md             # This file
 ```
 
 ## 🚀 Quick Start
 
-### Option 1: Using Docker Compose (Recommended)
+### Using Docker Compose (Recommended)
 
 ```bash
+# Start both services
 docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
-### Option 2: Using Helper Script
+### Using Helper Scripts
 
 ```bash
-./run-secure.sh
+# Start Flask app
+cd app && ./run-secure.sh
+
+# Start Nginx proxy
+cd nginx-proxy && ./run-proxy.sh
 ```
 
-### Option 3: Manual Docker Commands
+## 🌐 Access
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Nginx Proxy** | http://localhost:8080 | Main entry point (recommended) |
+| **Flask Direct** | http://localhost:5000 | Direct backend access |
+| **Health Check** | http://localhost:8080/health | Service health status |
+
+## 🔒 Security Features
+
+- Multi-stage Docker builds for minimal image size
+- Non-root user execution
+- Read-only root filesystem
+- Resource limits (CPU/memory)
+- No new privileges security option
+- Environment-based configuration
+- Alpine/slim base images
+
+## 📋 Common Commands
 
 ```bash
-# Build the image
-docker build -t flask-app .
+# Restart services
+docker-compose restart
 
-# Run with security hardening
-docker run -d \
-  --name flask-app-optimized \
-  -p 5000:5000 \
-  --read-only \
-  --tmpfs /tmp:size=10M,mode=1777 \
-  --security-opt=no-new-privileges:true \
-  --cap-drop=ALL \
-  -e ENVIRONMENT=production \
-  -e DEBUG=false \
-  flask-app
+# Rebuild and start
+docker-compose up -d --build
+
+# View container logs
+docker-compose logs nginx-proxy
+docker-compose logs flask-app
+
+# Execute command in container
+docker-compose exec flask-app sh
+
+# Check logs directory
+ls -lh logs/nginx-proxy/
+ls -lh logs/app/
 ```
 
-## ⚙️ Configuration
+## 📖 Detailed Documentation
 
-All configuration is externalized via environment variables:
+- **Flask App**: See [app/README.md](app/README.md) for application details, configuration, and deployment
+- **Nginx Proxy**: See [nginx-proxy/README.md](nginx-proxy/README.md) for proxy configuration and networking
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `APP_HOST` | `0.0.0.0` | Host to bind the application |
-| `APP_PORT` | `5000` | Port to run the application |
-| `ENVIRONMENT` | `production` | Environment name |
-| `DEBUG` | `false` | Enable Flask debug mode |
+## 🛠️ Configuration
 
-### Using .env File
+Environment variables (Flask app):
+- `APP_HOST` - Bind address (default: 0.0.0.0)
+- `APP_PORT` - Listen port (default: 5000)
+- `ENVIRONMENT` - Environment name (default: production)
+- `DEBUG` - Debug mode (default: false)
 
-```bash
-# Copy example file
-cp .env.example .env
-
-# Edit as needed
-vim .env
-
-# Use with docker-compose
-docker-compose up -d
-```
-
-### Override at Runtime
-
-```bash
-docker run -d \
-  -p 5000:5000 \
-  -e ENVIRONMENT=staging \
-  -e DEBUG=true \
-  flask-app
-```
+Edit `docker-compose.yml` to modify service configuration.
 
 ## 🧪 Testing
 
-Test the application endpoints:
-
 ```bash
-# Home endpoint
-curl http://localhost:5000
+# Test proxy routing
+curl http://localhost:8080
 
-# Health check endpoint
-curl http://localhost:5000/health
-```
+# Test health endpoint
+curl http://localhost:8080/health
 
-Expected responses:
-```
+# Expected output
 Hello from Docker! Running in production mode.
 {"environment":"production","status":"healthy"}
 ```
 
-## 🔍 Verify Security Features
-
-```bash
-# Verify read-only filesystem
-docker inspect flask-app-optimized --format='ReadonlyRootfs: {{.HostConfig.ReadonlyRootfs}}'
-
-# Verify non-root user
-docker inspect flask-app-optimized --format='User: {{.Config.User}}'
-
-# Verify security options
-docker inspect flask-app-optimized --format='SecurityOpt: {{.HostConfig.SecurityOpt}}'
-
-# Try to write to filesystem (should fail)
-docker exec flask-app-optimized touch /test.txt
-# Output: touch: cannot touch '/test.txt': Read-only file system
-```
-
-## 📋 Management Commands
-
-```bash
-# View logs
-docker logs flask-app-optimized
-
-# Follow logs
-docker logs -f flask-app-optimized
-
-# Stop container
-docker stop flask-app-optimized
-
-# Start stopped container
-docker start flask-app-optimized
-
-# Remove container
-docker rm -f flask-app-optimized
-
-# Check container status
-docker ps | grep flask-app
-```
-
-## 🏗️ Dockerfile Features
-
-### Multi-Stage Build
-
-```dockerfile
-# Stage 1: Builder - Install dependencies
-FROM python:3.9-slim AS builder
-# ... build steps ...
-
-# Stage 2: Runtime - Lean production image
-FROM python:3.9-slim
-# ... copy from builder ...
-```
-
-### Layer Caching Optimization
-
-```dockerfile
-# Copy requirements first (changes rarely)
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# Copy code last (changes frequently)
-COPY . .
-```
-
-## 🎯 Best Practices Summary
-
-- ✅ **Immutable Infrastructure**: Read-only filesystem
-- ✅ **Least Privilege**: Non-root user
-- ✅ **Defense in Depth**: Multiple security layers
-- ✅ **Separation of Concerns**: Multi-stage builds
-- ✅ **Configuration Management**: Externalized via env vars
-- ✅ **Minimal Attack Surface**: Slim base image
-- ✅ **Fast Builds**: Optimized layer caching
-- ✅ **Ephemeral Storage**: tmpfs for temporary files
-
-## 📚 Additional Resources
+## 📚 Learning Resources
 
 - [Docker Security Best Practices](https://docs.docker.com/develop/security-best-practices/)
-- [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker)
-- [OWASP Docker Security](https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html)
-
-## 🤝 Contributing
-
-Suggestions for additional security improvements are welcome!
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Nginx Reverse Proxy Guide](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)
