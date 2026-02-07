@@ -4,6 +4,25 @@ This directory contains the Nginx reverse proxy configuration to route traffic t
 
 ## Setup Instructions
 
+### Option 1: Using the Run Script (Recommended)
+
+The easiest way to start the proxy:
+
+```bash
+cd nginx-proxy
+./run-proxy.sh
+```
+
+This script will:
+- Check Docker availability
+- Clean up any existing containers
+- Build the Nginx image
+- Start the container on port 8080
+- Test backend connectivity
+- Log all operations to `nginx-proxy.log`
+
+### Option 2: Manual Setup
+
 ### 1. Ensure Flask App is Running
 
 First, make sure your Flask app is running:
