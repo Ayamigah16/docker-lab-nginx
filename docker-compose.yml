@@ -1,0 +1,54 @@
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  flask-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: flask-app-secure
+    ports:
+      - "5000:5000"
+    networks:
+      - app-network
+    volumes:
+      - ./logs/app:/logs
+    # Read-only root filesystem for security
+    read_only: true
+    # Temporary filesystem for Python's temp files
+    tmpfs:
+      - /tmp:size=10M,mode=1777
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=5000
+      - ENVIRONMENT=production
+      - DEBUG=false
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    restart: unless-stopped
+
+  nginx-proxy:
+    build:
+      context: ./nginx-proxy
+      dockerfile: Dockerfile
+    container_name: nginx-proxy
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+    volumes:
+      - ./logs/nginx-proxy:/var/log/nginx
+    depends_on:
+      - flask-app
+    restart: unless-stopped
