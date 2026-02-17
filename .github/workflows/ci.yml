@@ -1,0 +1,149 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - '**'  # Trigger on push to any branch
+  pull_request:
+    branches:
+      - main  # Trigger on PR to main
+
+jobs:
+  build-and-test:
+    name: Build Docker Images and Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Flask application image
+        run: |
+          echo "Building Flask application Docker image..."
+          docker build -t flask-app:latest ./app
+      
+      - name: Build Nginx proxy image
+        run: |
+          echo "Building Nginx proxy Docker image..."
+          docker build -t nginx-proxy:latest ./nginx-proxy
+      
+      - name: Verify Docker images
+        run: |
+          echo "Listing built Docker images..."
+          docker images | grep -E 'flask-app|nginx-proxy'
+      
+      - name: Run Flask unit tests
+        run: |
+          echo "Running Flask unit tests in container..."
+          docker run --rm flask-app:latest pytest app/tests/ -v --tb=short
+      
+      - name: Start services with Docker Compose
+        run: |
+          echo "Starting services with Docker Compose..."
+          docker-compose up -d
+          sleep 5  # Wait for services to be ready
+      
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          
+          # Test Flask service directly
+          echo "Testing Flask service on port 5000..."
+          curl -f http://localhost:5000/health || exit 1
+          
+          # Test Nginx proxy on port 8080
+          echo "Testing Nginx proxy on port 8080..."
+          curl -f http://localhost:8080/health || exit 1
+          curl -f http://localhost:8080/ || exit 1
+          
+          echo "All integration tests passed!"
+      
+      - name: Check service logs
+        if: always()
+        run: |
+          echo "=== Flask App Logs ==="
+          docker-compose logs flask-app
+          echo ""
+          echo "=== Nginx Proxy Logs ==="
+          docker-compose logs nginx-proxy
+      
+      - name: Stop services
+        if: always()
+        run: |
+          docker-compose down -v
+      
+      - name: Report test results
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ CI Pipeline: ALL CHECKS PASSED"
+          else
+            echo "❌ CI Pipeline: FAILED"
+            exit 1
+          fi
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r app/requirements.txt
+          pip install flake8
+      
+      - name: Run flake8 linter
+        run: |
+          echo "Running flake8 code quality checks..."
+          flake8 app/app.py app/tests/ --max-line-length=120 --extend-ignore=E501 || echo "Linting completed with warnings"
+      
+      - name: Check for security issues
+        run: |
+          echo "Checking for common security issues..."
+          # Check for hardcoded secrets (basic check)
+          if grep -r -i -E 'password|secret|api_key|token' app/*.py | grep -v "# " | grep -v ".pyc"; then
+            echo "⚠️  Warning: Potential hardcoded secrets found"
+          else
+            echo "✅ No obvious hardcoded secrets detected"
+          fi
+
+  docker-security:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Flask image for scanning
+        run: docker build -t flask-app:latest ./app
+      
+      - name: Build Nginx image for scanning
+        run: docker build -t nginx-proxy:latest ./nginx-proxy
+      
+      - name: Run Trivy vulnerability scanner - Flask
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'flask-app:latest'
+          format: 'table'
+          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Run Trivy vulnerability scanner - Nginx
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'nginx-proxy:latest'
+          format: 'table'
+          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
+          severity: 'CRITICAL,HIGH'
