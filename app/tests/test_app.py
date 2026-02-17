@@ -50,9 +50,26 @@ def test_health_endpoint_has_required_fields(client):
     response = client.get('/health')
     json_data = response.get_json()
     
+    # Test basic required fields
     assert 'status' in json_data
     assert 'environment' in json_data
     assert json_data['status'] == 'healthy'
+    
+    # Test Sprint 2: US-07 enhanced fields
+    assert 'version' in json_data
+    assert 'uptime_seconds' in json_data
+    assert 'timestamp' in json_data
+    
+    # Verify data types
+    assert isinstance(json_data['version'], str)
+    assert isinstance(json_data['uptime_seconds'], int)
+    assert isinstance(json_data['timestamp'], str)
+    
+    # Verify uptime is non-negative
+    assert json_data['uptime_seconds'] >= 0
+    
+    # Verify timestamp format (ISO 8601 with Z suffix)
+    assert json_data['timestamp'].endswith('Z')
 
 
 def test_invalid_route_returns_404(client):
