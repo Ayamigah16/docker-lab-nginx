@@ -38,12 +38,12 @@ jobs:
       - name: Run Flask unit tests
         run: |
           echo "Running Flask unit tests in container..."
-          docker run --rm flask-app:latest pytest app/tests/ -v --tb=short
+          docker run --rm flask-app:latest pytest tests/ -v --tb=short
       
       - name: Start services with Docker Compose
         run: |
           echo "Starting services with Docker Compose..."
-          docker-compose up -d
+          docker compose up -d
           sleep 5  # Wait for services to be ready
       
       - name: Run integration tests
@@ -65,15 +65,15 @@ jobs:
         if: always()
         run: |
           echo "=== Flask App Logs ==="
-          docker-compose logs flask-app
+          docker compose logs flask-app
           echo ""
           echo "=== Nginx Proxy Logs ==="
-          docker-compose logs nginx-proxy
+          docker compose logs nginx-proxy
       
       - name: Stop services
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
       
       - name: Report test results
         if: always()
